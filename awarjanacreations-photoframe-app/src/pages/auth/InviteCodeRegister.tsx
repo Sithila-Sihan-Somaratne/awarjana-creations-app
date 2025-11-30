@@ -1,10 +1,10 @@
 import PublicLayout from "../../components/layout/PublicLayout";
 
-const SignIn: React.FC = () => (
+const InviteCodeRegister: React.FC = () => (
   <PublicLayout>
-    <h2>Sign In</h2>
+    <h2>Register with Invite Code (Admin/Worker)</h2>
     {/* ...form here... */}
   </PublicLayout>
 );
 
-export default SignIn;
+export default InviteCodeRegister;

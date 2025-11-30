@@ -1,10 +1,10 @@
 import PublicLayout from "../../components/layout/PublicLayout";
 
-const SignIn: React.FC = () => (
+const SignUp: React.FC = () => (
   <PublicLayout>
-    <h2>Sign In</h2>
+    <h2>Sign Up as Customer</h2>
     {/* ...form here... */}
   </PublicLayout>
 );
 
-export default SignIn;
+export default SignUp;

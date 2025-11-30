@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { calculatePrice, type SizeOption } from "../../lib/pricing";
+import { calculateClientPrice, type SizeOption } from "../../lib/pricing";
 
 type Props = {
   basePrice?: number;
@@ -11,7 +11,7 @@ const Calculator: React.FC<Props> = ({ basePrice = 100 }) => {
   const [urgency, setUrgency] = useState<"normal" | "urgent">("normal");
   const [discount, setDiscount] = useState(0);
 
-  const price = calculatePrice({ size, quantity, urgency, basePrice, discount });
+  const price = calculateClientPrice({ size, quantity, urgency, basePrice, discount });
 
   return (
     <div className="p-4 rounded bg-neutral-700">

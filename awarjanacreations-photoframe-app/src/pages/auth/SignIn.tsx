@@ -6,7 +6,7 @@ import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '../..
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
 import { Label } from '../../components/ui/label';
-import { useAuth } from '../../components/hooks/useAuth';
+import { useAuth } from '../../hooks/use-auth';
 import { supabase } from '../../lib/supabaseClient';
 import { cn } from '../../lib/utils';
 

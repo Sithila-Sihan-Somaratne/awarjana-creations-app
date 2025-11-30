@@ -1,135 +1,134 @@
 // src/lib/pricing.ts
 
-import { supabase } from './supabaseClient';
-
-// Define the required types based on the DB schema
-// Note: We use string for IDs and numbers for costs/multipliers
-export type OrderItem = {
-  productId: string;
-  sizeId: string;
-  qty: number;
+/* ---------------------------------------------
+   TYPES
+--------------------------------------------- */
+export type PricingConfig = {
+  reference: {
+    width_cm: number;
+    height_cm: number;
+    area_m2: number;
+  };
+  materials: {
+    frame: number;
+    glass: number;
+    mdf: number;
+    stand?: number;
+    hook?: number;
+    under_pin?: number;
+    side_pin?: number;
+    [k: string]: number | undefined;
+  };
+  overheads: {
+    wages: number;
+    electricity: number;
+    [k: string]: number | undefined;
+  };
+  meta?: {
+    total_reference_cost?: number;
+    notes?: string;
+  };
+  business?: {
+    profitMarginPct?: number;
+    urgentMultiplier?: number;
+    smallOrderSurcharge?: number;
+  };
 };
 
-export type Product = {
-  id: string;
-  base_price: number; // Base cost of the frame material
-};
+/* ---------------------------------------------
+   DEFAULT CONFIG (ROUNDED VALUES)
+--------------------------------------------- */
+export const DEFAULT_PRICING_CONFIG: PricingConfig = {
+  reference: {
+    width_cm: 48,
+    height_cm: 96,
+    area_m2: 0.48 * 0.96 // 0.4608
+  },
 
-export type Size = {
-  id: string;
-  multiplier: number; // Size factor (e.g., 1.5x the base price)
-};
+  materials: {
+    frame: 518.0, // ✅ rounded from 518.518...
+    glass: 300.0,
+    mdf: 115.0,
+    stand: 50.0,
+    hook: 10.0,
+    under_pin: 20.0,
+    side_pin: 10.0
+  },
 
-export type PricingRules = {
-  urgent_multiplier: number;
-  base_labor_cost: number;
-  // Add other extracted constants like late_discount_small etc.
-};
+  overheads: {
+    wages: 100.0,
+    electricity: 50.0
+  },
 
-/**
- * Fetches the necessary pricing rules from the Supabase DB.
- * In a real app, this should be cached or loaded once on app start.
- */
-async function getPricingRules(): Promise<PricingRules> {
-  // Fetch pricing rules from the DB. We assume the DB contains rows named:
-  // 'urgent_fee', 'base_labor', etc., as structured in the SQL plan.
-  const { data, error } = await supabase
-    .from('pricing_rules')
-    .select('name, value');
+  meta: {
+    total_reference_cost: 1173.0,
+    notes: "Imported from cost.xlsx (rounded reference values)."
+  },
 
-  if (error) {
-    console.error('Error fetching pricing rules:', error);
-    throw new Error('Failed to load pricing data.');
+  business: {
+    profitMarginPct: 0.3,   // 30%
+    urgentMultiplier: 1.25, // 25% urgent extra
+    smallOrderSurcharge: 0
   }
+};
 
-  // Convert the array of rules into a single, usable object
-  const rules = data.reduce((acc, rule) => {
-    if (rule.name === 'urgent_fee') {
-      acc.urgent_multiplier = rule.value.multiplier || 1.35;
-    }
-    if (rule.name === 'base_labor') {
-      acc.base_labor_cost = rule.value.cost || 25.00;
-    }
-    // Add logic for other rules (discounts, major late fee, etc.)
-    return acc;
-  }, {} as any) as PricingRules;
-
-  if (!rules.urgent_multiplier || !rules.base_labor_cost) {
-      console.warn("Missing critical pricing rules! Check database setup.");
-  }
-
-  return rules;
+/* ---------------------------------------------
+   HELPER: SCALE COST BY AREA
+--------------------------------------------- */
+export function scaleMaterialCost(
+  referenceArea: number,
+  actualArea: number,
+  baseCost: number
+): number {
+  if (!referenceArea || !actualArea) return 0;
+  const ratio = actualArea / referenceArea;
+  return Number((baseCost * ratio).toFixed(2));
 }
 
-/**
- * Calculates the total cost for a list of order items.
- * NOTE: This function is for CLIENT-SIDE estimation. The server must re-calculate
- * the final authoritative price upon order confirmation.
- *
- * @param items - Array of items with product/size IDs and quantity.
- * @param isUrgent - Flag if the 'urgent' deadline is selected.
- * @param discountPct - Percentage discount (0-100).
- * @returns Object containing the estimated subtotal and discounted final price.
- */
-export async function calculatePriceEstimate(
-  items: OrderItem[],
-  isUrgent: boolean,
-  discountPct: number = 0
-): Promise<{ subtotal: number; finalPrice: number }> {
-  if (items.length === 0) return { subtotal: 0, finalPrice: 0 };
+/* ---------------------------------------------
+   HELPER: FINAL PRICE CALCULATION (CLIENT SIDE)
+--------------------------------------------- */
+export function calculateClientPrice(
+  config: PricingConfig,
+  width_cm: number,
+  height_cm: number,
+  quantity: number,
+  isUrgent: boolean = false
+) {
+  const area_m2 = (width_cm / 100) * (height_cm / 100);
+  const referenceArea = config.reference.area_m2;
 
-  const rules = await getPricingRules();
+  // 1. Scale materials
+  let materialTotal = 0;
 
-  // 1. Fetch all unique product and size details for the calculation
-  // (In a real scenario, optimize this query to fetch all needed data efficiently)
-  // For simplicity here, we assume a combined cost is available.
-
-  // Placeholder for fetching product and size data from DB:
-  // const { data: productsData } = await supabase.from('products').select('id, base_price');
-  // const { data: sizesData } = await supabase.from('sizes').select('id, multiplier');
-  // ... (map the fetched data to a lookup object)
-  
-  // --- Start of Core Calculation Logic ---
-  
-  let materialsCost = 0;
-  
-  // --- Mapping the CSV structure to calculation: ---
-  // The CSV shows: Frame: 518.5, Glass: 300, MDF: 115, etc.
-  // We assume the 'base_price' in the DB (for a Product) represents the total material cost
-  // for the SMALLEST size (Multiplier 1.0) and already includes 'Wages' and 'Electricity'.
-  
-  // For the sake of completing the code structure:
-  const productPriceLookup = new Map<string, Product>(); // Replace with actual DB fetch
-  const sizeMultiplierLookup = new Map<string, Size>(); // Replace with actual DB fetch
-
-  // Simulate fetching/mapping the product/size data for calculation
-  // You must implement the actual data fetching here.
-  
-  for (const item of items) {
-    const product = productPriceLookup.get(item.productId);
-    const size = sizeMultiplierLookup.get(item.sizeId);
-    
-    if (product && size) {
-      const unitPrice = product.base_price * size.multiplier;
-      materialsCost += unitPrice * item.qty;
-    } else {
-      console.warn(`Missing product or size data for item: ${item.productId}/${item.sizeId}`);
-    }
+  for (const key in config.materials) {
+    const baseCost = config.materials[key] ?? 0;
+    materialTotal += scaleMaterialCost(
+      referenceArea,
+      area_m2,
+      baseCost
+    );
   }
 
-  // 2. Apply fixed costs (Base Labor)
-  let subtotal = materialsCost + rules.base_labor_cost;
+  // 2. Add overheads
+  const overheadTotal =
+    (config.overheads.wages ?? 0) +
+    (config.overheads.electricity ?? 0);
 
-  // 3. Apply Urgent Multiplier
-  if (isUrgent) {
-    subtotal *= rules.urgent_multiplier;
+  // 3. Base cost × quantity
+  let subtotal =
+    (materialTotal + overheadTotal) * quantity;
+
+  // 4. Profit margin
+  if (config.business?.profitMarginPct) {
+    subtotal +=
+      subtotal * config.business.profitMarginPct;
   }
 
-  // 4. Apply Discount
-  const finalPrice = subtotal * (1 - discountPct / 100);
+  // 5. Urgent multiplier
+  if (isUrgent && config.business?.urgentMultiplier) {
+    subtotal *= config.business.urgentMultiplier;
+  }
 
-  return {
-    subtotal: parseFloat(subtotal.toFixed(2)),
-    finalPrice: parseFloat(finalPrice.toFixed(2)),
-  };
+  return Number(subtotal.toFixed(2));
 }

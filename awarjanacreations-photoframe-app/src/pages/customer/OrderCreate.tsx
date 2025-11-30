@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
-import { calculatePrice } from "../../lib/pricing";
+import { calculateClientPrice } from "../../lib/pricing";
 
 import { Card } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
@@ -51,7 +51,7 @@ const OrderCreate = () => {
     const sizeObj = sizes.find((s) => s.label === sizeLabel);
     if (product && sizeObj) {
       setPrice(
-        calculatePrice({
+        calculateClientPrice({
           size: { label: sizeObj.label, multiplier: sizeObj.multiplier },
           quantity,
           urgency,

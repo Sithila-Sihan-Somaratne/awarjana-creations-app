@@ -22,7 +22,7 @@ import JobDetail from "../pages/worker/JobDetail";
 import OrderCreate from "../pages/customer/OrderCreate";
 import OrderDetail from "../pages/customer/OrderDetail";
 
-/* Public pages */
+/* Public pages (fixed paths) */
 import Home from "../public/Home";
 import Pricing from "../public/Pricing";
 

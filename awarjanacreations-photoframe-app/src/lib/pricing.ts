@@ -1,134 +1,119 @@
 // src/lib/pricing.ts
 
-/* ---------------------------------------------
+/* -----------------------------
    TYPES
---------------------------------------------- */
+-------------------------------- */
+
+export type SizeOption = {
+  label: string;
+  multiplier: number;
+};
+
 export type PricingConfig = {
   reference: {
     width_cm: number;
     height_cm: number;
-    area_m2: number;
   };
-  materials: {
-    frame: number;
-    glass: number;
-    mdf: number;
-    stand?: number;
-    hook?: number;
-    under_pin?: number;
-    side_pin?: number;
-    [k: string]: number | undefined;
+  business: {
+    profitMarginPct: number;   // 0.25 = 25%
+    urgentMultiplier: number; // e.g. 1.5
   };
   overheads: {
     wages: number;
     electricity: number;
-    [k: string]: number | undefined;
   };
-  meta?: {
-    total_reference_cost?: number;
-    notes?: string;
-  };
-  business?: {
-    profitMarginPct?: number;
-    urgentMultiplier?: number;
-    smallOrderSurcharge?: number;
-  };
+  materials: Record<string, number>;
 };
 
-/* ---------------------------------------------
-   DEFAULT CONFIG (ROUNDED VALUES)
---------------------------------------------- */
+/* -----------------------------
+   DEFAULT CONFIG (518.0 FIXED ✅)
+-------------------------------- */
+
 export const DEFAULT_PRICING_CONFIG: PricingConfig = {
   reference: {
-    width_cm: 48,
-    height_cm: 96,
-    area_m2: 0.48 * 0.96 // 0.4608
+    width_cm: 30,
+    height_cm: 20,
   },
-
-  materials: {
-    frame: 518.0, // ✅ rounded from 518.518...
-    glass: 300.0,
-    mdf: 115.0,
-    stand: 50.0,
-    hook: 10.0,
-    under_pin: 20.0,
-    side_pin: 10.0
-  },
-
-  overheads: {
-    wages: 100.0,
-    electricity: 50.0
-  },
-
-  meta: {
-    total_reference_cost: 1173.0,
-    notes: "Imported from cost.xlsx (rounded reference values)."
-  },
-
   business: {
-    profitMarginPct: 0.3,   // 30%
-    urgentMultiplier: 1.25, // 25% urgent extra
-    smallOrderSurcharge: 0
-  }
+    profitMarginPct: 0.25,     // 25%
+    urgentMultiplier: 1.5,
+  },
+  overheads: {
+    wages: 518.0,             // ✅ FIXED FROM 518.518 → 518.0
+    electricity: 120,
+  },
+  materials: {
+    wood: 350,
+    glass: 240,
+    print: 180,
+  },
 };
 
-/* ---------------------------------------------
-   HELPER: SCALE COST BY AREA
---------------------------------------------- */
-export function scaleMaterialCost(
-  referenceArea: number,
-  actualArea: number,
-  baseCost: number
+/* -----------------------------
+   SERVER / ADMIN PRICE CALC
+   (Used by OrderCreate.tsx)
+-------------------------------- */
+
+export function calculatePrice(
+  config: PricingConfig,
+  widthCm: number,
+  heightCm: number,
+  quantity: number,
+  isUrgent: boolean
 ): number {
-  if (!referenceArea || !actualArea) return 0;
-  const ratio = actualArea / referenceArea;
-  return Number((baseCost * ratio).toFixed(2));
+  const areaFactor =
+    (widthCm * heightCm) /
+    (config.reference.width_cm * config.reference.height_cm);
+
+  // Base material cost
+  const materialCost =
+    Object.values(config.materials).reduce((a, b) => a + b, 0) * areaFactor;
+
+  // Overheads
+  const overheadCost =
+    (config.overheads.wages + config.overheads.electricity) * areaFactor;
+
+  // Raw cost
+  let cost = (materialCost + overheadCost) * quantity;
+
+  // Profit
+  cost = cost * (1 + config.business.profitMarginPct);
+
+  // Urgency
+  if (isUrgent) {
+    cost = cost * config.business.urgentMultiplier;
+  }
+
+  return Math.round(cost);
 }
 
-/* ---------------------------------------------
-   HELPER: FINAL PRICE CALCULATION (CLIENT SIDE)
---------------------------------------------- */
-export function calculateClientPrice(
-  config: PricingConfig,
-  width_cm: number,
-  height_cm: number,
-  quantity: number,
-  isUrgent: boolean = false
-) {
-  const area_m2 = (width_cm / 100) * (height_cm / 100);
-  const referenceArea = config.reference.area_m2;
+/* -----------------------------
+   CLIENT‑SIDE SIMPLE CALCULATOR
+   (Used by Calculator.tsx)
+-------------------------------- */
 
-  // 1. Scale materials
-  let materialTotal = 0;
+export function calculateClientPrice({
+  size,
+  quantity,
+  urgency,
+  basePrice,
+  discount = 0,
+}: {
+  size: SizeOption;
+  quantity: number;
+  urgency: "normal" | "urgent";
+  basePrice: number;
+  discount?: number;
+}): number {
+  let price = basePrice * size.multiplier * quantity;
 
-  for (const key in config.materials) {
-    const baseCost = config.materials[key] ?? 0;
-    materialTotal += scaleMaterialCost(
-      referenceArea,
-      area_m2,
-      baseCost
-    );
+  if (urgency === "urgent") {
+    price = price * 1.25;
   }
 
-  // 2. Add overheads
-  const overheadTotal =
-    (config.overheads.wages ?? 0) +
-    (config.overheads.electricity ?? 0);
-
-  // 3. Base cost × quantity
-  let subtotal =
-    (materialTotal + overheadTotal) * quantity;
-
-  // 4. Profit margin
-  if (config.business?.profitMarginPct) {
-    subtotal +=
-      subtotal * config.business.profitMarginPct;
+  if (discount > 0) {
+    price = price - discount;
   }
 
-  // 5. Urgent multiplier
-  if (isUrgent && config.business?.urgentMultiplier) {
-    subtotal *= config.business.urgentMultiplier;
-  }
-
-  return Number(subtotal.toFixed(2));
+  return Math.round(price);
 }

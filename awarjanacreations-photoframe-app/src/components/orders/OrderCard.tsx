@@ -7,17 +7,13 @@ export type Order = {
   totalPrice: number;
 };
 
-type Props = {
-  order: Order;
-};
-
-const OrderCard: React.FC<Props> = ({ order }) => (
-  <div className="p-4 rounded-lg shadow-md bg-neutral-800 mb-3">
-    <h3 className="font-bold text-lg">{order.title}</h3>
+const OrderCard: React.FC<{ order: Order }> = ({ order }) => (
+  <div className="p-4 rounded bg-neutral-800 mb-3">
+    <h3 className="font-bold">{order.title}</h3>
     <p>Customer: {order.customerName || "Unknown"}</p>
     <OrderTracker status={order.status} />
-    <div className="text-right text-sm text-green-200">
-      Total: රු. {order.totalPrice}
+    <div className="text-right mt-2 font-bold">
+      Total: Rs. {order.totalPrice}
     </div>
   </div>
 );

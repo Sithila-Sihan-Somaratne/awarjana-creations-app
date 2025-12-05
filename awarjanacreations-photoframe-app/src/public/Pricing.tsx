@@ -1,12 +1,12 @@
-import PublicLayout from "../components/layout/PublicLayout";
 import Calculator from "../components/pricing/Calculator";
 
-const Pricing: React.FC = () => (
-  <PublicLayout>
-    <h2>Pricing</h2>
-    <Calculator basePrice={150} />
-    {/* ...info about products, etc... */}
-  </PublicLayout>
-);
+const Pricing: React.FC = () => {
+  return (
+    <div className="space-y-6">
+      <h2 className="text-3xl font-bold">Pricing</h2>
+      <Calculator />
+    </div>
+  );
+};
 
 export default Pricing;

@@ -1,18 +1,48 @@
-import AdminLayout from "../../components/layout/AdminLayout";
+import { useEffect, useState } from "react";
+import { supabase } from "../../lib/supabaseClient";
 import OrderCard, { type Order } from "../../components/orders/OrderCard";
 
-const mockOrders: Order[] = [
-  { title: "Frame #1", customerName: "Nimal", status: "pending", totalPrice: 1000 },
-  { title: "Frame #2", customerName: "Sunil", status: "confirmed", totalPrice: 2050 },
-];
+const OrdersAdmin: React.FC = () => {
+  const [orders, setOrders] = useState<Order[]>([]);
 
-const OrdersAdmin: React.FC = () => (
-  <AdminLayout>
-    <h2>All Orders</h2>
-    {mockOrders.map((o) => (
-      <OrderCard order={o} key={o.title} />
-    ))}
-  </AdminLayout>
-);
+  useEffect(() => {
+    const loadOrders = async () => {
+      const { data } = await supabase
+        .from("orders")
+        .select(`
+          id,
+          total_price,
+          status,
+          customer:profiles(full_name),
+          product:products(title)
+        `)
+        .order("created_at", { ascending: false });
+
+      if (!data) return;
+
+      const mapped = data.map((o: any) => ({
+        id: o.id,
+        title: o.product?.title ?? "N/A",
+        customerName: o.customer?.full_name ?? "N/A",
+        status: o.status,
+        totalPrice: o.total_price,
+      }));
+
+      setOrders(mapped);
+    };
+
+    loadOrders();
+  }, []);
+
+  return (
+    <div className="space-y-6">
+      <h2 className="text-2xl font-bold">All Orders</h2>
+
+      {orders.map((o) => (
+        <OrderCard order={o} key={o.id} />
+      ))}
+    </div>
+  );
+};
 
 export default OrdersAdmin;

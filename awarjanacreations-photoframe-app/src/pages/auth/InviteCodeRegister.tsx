@@ -4,7 +4,7 @@ import { Card } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 
-const InviteCodeRegister = () => {
+const InviteCodeRegister: React.FC = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [inviteCode, setInviteCode] = useState("");
@@ -16,110 +16,69 @@ const InviteCodeRegister = () => {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    setSuccess(null);
 
-    // Check invite code against Supabase table
     let role = "customer";
+
     if (inviteCode.trim()) {
-      const { data, error: codeError } = await supabase
+      const { data, error } = await supabase
         .from("invite_codes")
-        .select("role,used")
-        .eq("code", inviteCode.trim())
+        .select("role, used")
+        .eq("code", inviteCode)
         .single();
 
-      if (codeError || !data || data.used) {
-        setError("Invalid or already used invite code.");
+      if (error || !data || data.used) {
+        setError("Invalid invite code.");
         setLoading(false);
         return;
       }
+
       role = data.role;
     }
 
-    // Register user with Supabase Auth
-    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
     });
 
-    if (signUpError) {
-      setError(signUpError.message);
+    if (error || !data.user) {
+      setError(error?.message || "Signup failed.");
       setLoading(false);
       return;
     }
 
-    // Update profiles table with role
-    const user = signUpData.user;
-    if (user) {
-      await supabase
-        .from("profiles")
-        .insert([
-          {
-            id: user.id,
-            full_name: "",
-            role: role,
-            created_at: new Date().toISOString(),
-          },
-        ]);
+    await supabase.from("profiles").insert({
+      id: data.user.id,
+      role,
+      created_at: new Date(),
+    });
 
-      // Mark code as used if present
-      if (inviteCode.trim()) {
-        await supabase
-          .from("invite_codes")
-          .update({ used: true })
-          .eq("code", inviteCode.trim());
-      }
-      setSuccess("Registration successful! Check your email to verify your account.");
+    if (inviteCode) {
+      await supabase.from("invite_codes").update({ used: true }).eq("code", inviteCode);
     }
+
+    setSuccess("Registration successful!");
     setLoading(false);
   }
 
   return (
-    <div className="flex justify-center items-center min-h-screen bg-neutral-950">
-      <Card className="w-full max-w-md bg-background border border-brand-500 p-6 rounded-lg shadow-lg">
-        <h2 className="text-2xl font-semibold text-brand-500 mb-6 text-center">
-          Register (Worker/Admin via Invite Code)
-        </h2>
-        <form className="space-y-4" onSubmit={handleRegister}>
-          <div>
-            <label htmlFor="email" className="block font-semibold mb-1">
-              Email
-            </label>
-            <Input
-              id="email"
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-          </div>
-          <div>
-            <label htmlFor="password" className="block font-semibold mb-1">
-              Password
-            </label>
-            <Input
-              id="password"
-              type="password"
-              autoComplete="new-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-          </div>
-          <div>
-            <label htmlFor="inviteCode" className="block font-semibold mb-1">
-              Invite Code (for Worker/Admin)
-            </label>
-            <Input
-              id="inviteCode"
-              type="text"
-              value={inviteCode}
-              onChange={(e) => setInviteCode(e.target.value)}
-            />
-          </div>
-          {error && <div className="text-red-600">{error}</div>}
-          {success && <div className="text-green-500">{success}</div>}
-          <Button type="submit" className="w-full mt-6" disabled={loading}>
+    <div className="flex justify-center items-center min-h-screen">
+      <Card className="w-full max-w-md p-6">
+        <h2 className="text-xl font-bold mb-4">Register</h2>
+
+        <form onSubmit={handleRegister} className="space-y-4">
+          <Input value={email} onChange={(e) => setEmail(e.target.value)} required />
+          <Input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+          <Input value={inviteCode} onChange={(e) => setInviteCode(e.target.value)} />
+
+          {error && <p className="text-red-500">{error}</p>}
+          {success && <p className="text-green-500">{success}</p>}
+
+          <Button type="submit" disabled={loading}>
             {loading ? "Registering..." : "Register"}
           </Button>
         </form>

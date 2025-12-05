@@ -3,9 +3,8 @@ import OrderTracker from "../../components/shared/OrderTracker";
 
 const JobDetail: React.FC = () => (
   <WorkerLayout>
-    <h2>Job Detail</h2>
+    <h2 className="text-2xl font-bold mb-4">Job Detail</h2>
     <OrderTracker status="in_progress" />
-    {/* ...job details/actions... */}
   </WorkerLayout>
 );
 

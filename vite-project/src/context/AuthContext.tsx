@@ -1,45 +1,58 @@
-// src/context/AuthContext.tsx
-import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { supabase } from "../lib/supabaseClient";
+
+type Role = "customer" | "worker" | "admin" | null;
 
 interface AuthContextType {
   userId: string | null;
-  userRole: "customer" | "worker" | "admin" | null;
+  userRole: Role;
+  loading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType>({
   userId: null,
   userRole: null,
+  loading: true,
 });
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [userId, setUserId] = useState<string | null>(null);
-  const [userRole, setUserRole] = useState<"customer" | "worker" | "admin" | null>(null);
+  const [userRole, setUserRole] = useState<Role>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchSession = async () => {
+    const loadSession = async () => {
       const { data } = await supabase.auth.getSession();
       const session = data.session;
-      if (session) {
-        setUserId(session.user.id);
 
-        // fetch role from users table
-        const { data: userData, error } = await supabase
-          .from("users")
-          .select("role")
-          .eq("id", session.user.id)
-          .single();
-
-        if (!error && userData) setUserRole(userData.role);
+      if (!session) {
+        setUserId(null);
+        setUserRole(null);
+        setLoading(false);
+        return;
       }
+
+      setUserId(session.user.id);
+
+      const { data: userData } = await supabase
+        .from("users")
+        .select("role")
+        .eq("id", session.user.id)
+        .single();
+
+      setUserRole(userData?.role ?? null);
+      setLoading(false);
     };
 
-    fetchSession();
+    loadSession();
 
-    // optional: listen to auth changes
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) setUserId(session.user.id);
-      else setUserId(null);
+      if (!session) {
+        setUserId(null);
+        setUserRole(null);
+      } else {
+        setUserId(session.user.id);
+      }
     });
 
     return () => {
@@ -48,7 +61,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ userId, userRole }}>
+    <AuthContext.Provider value={{ userId, userRole, loading }}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
+
 import Header from "./components/layout/Header";
 import Footer from "./components/layout/Footer";
 import Sidebar from "./components/layout/Sidebar";
@@ -16,18 +17,44 @@ import DraftApproval from "./routes/admin/DraftApproval";
 import MaterialsManagement from "./routes/admin/MaterialsManagement";
 import PricingManagement from "./routes/admin/PricingManagement";
 
+import SignIn from "./routes/auth/SignIn";
+import SignUp from "./routes/auth/SignUp";
+
 const AppRoutes = () => {
-  const { userRole } = useAuth();
+  const { userId, userRole, loading } = useAuth();
 
-  if (!userRole) return <p className="text-white p-6">Loading...</p>;
+  // ✅ Still checking session
+  if (loading) {
+    return <p className="text-white p-6">Checking session...</p>;
+  }
 
+  // ✅ NOT logged in
+  if (!userId) {
+    return (
+      <Routes>
+        <Route path="/signin" element={<SignIn />} />
+        <Route path="/signup" element={<SignUp />} />
+        <Route path="*" element={<Navigate to="/signin" replace />} />
+      </Routes>
+    );
+  }
+
+  // ✅ Logged in but role not loaded
+  if (!userRole) {
+    return <p className="text-white p-6">Loading user role...</p>;
+  }
+
+  // ✅ Fully authenticated
   return (
     <div className="flex min-h-screen bg-black text-white">
       <Sidebar />
+
       <div className="flex-1 flex flex-col">
         <Header />
+
         <div className="flex-1 p-6 overflow-auto">
           <Routes>
+
             {/* CUSTOMER */}
             {userRole === "customer" && (
               <>
@@ -55,10 +82,12 @@ const AppRoutes = () => {
               </>
             )}
 
-            {/* Default redirect */}
+            {/* ✅ Default redirect after login */}
             <Route path="*" element={<Navigate to={`/${userRole}`} replace />} />
+
           </Routes>
         </div>
+
         <Footer />
       </div>
     </div>

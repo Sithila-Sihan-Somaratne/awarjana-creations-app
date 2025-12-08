@@ -2,36 +2,33 @@ import { useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
 import { Input } from "../../components/ui/input";
 import { Button } from "../../components/ui/button";
-import { useToast } from "../../hooks/use-toast";
 
-const ForgotPasswordForm = () => {
-  const { toast } = useToast();
+export default function ForgotPassword() {
   const [email, setEmail] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
 
-  const handleReset = async () => {
-    setLoading(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: window.location.origin + "/reset-password"
-    });
+  const resetPassword = async () => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email);
 
-    if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
-    else toast({ title: "Success", description: "Password reset email sent!" });
-
-    setLoading(false);
+    if (error) setMessage(error.message);
+    else setMessage("Password reset email sent!");
   };
 
   return (
-    <div className="p-4 bg-black rounded shadow-lg text-white max-w-md mx-auto">
-      <h2 className="text-yellow-400 text-2xl mb-4">Forgot Password</h2>
-      <div className="flex flex-col gap-2">
-        <Input placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} />
-        <Button onClick={handleReset} disabled={loading}>
-          {loading ? "Sending..." : "Send Reset Email"}
-        </Button>
+    <div className="min-h-screen flex items-center justify-center bg-black text-white">
+      <div className="bg-zinc-900 p-8 rounded w-96 space-y-4">
+        <h2 className="text-yellow-400 text-xl">Reset Password</h2>
+
+        <Input
+          placeholder="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+
+        <Button onClick={resetPassword}>Send Reset Link</Button>
+
+        {message && <p className="text-sm text-center">{message}</p>}
       </div>
     </div>
   );
-};
-
-export default ForgotPasswordForm;
+}

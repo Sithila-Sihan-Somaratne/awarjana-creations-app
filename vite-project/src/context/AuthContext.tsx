@@ -1,3 +1,4 @@
+// src/context/AuthContext.tsx
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { supabase } from "../lib/supabaseClient";
 
@@ -22,6 +23,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const loadSession = async () => {
+      setLoading(true);
       const { data } = await supabase.auth.getSession();
       const session = data.session;
 
@@ -46,17 +48,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     loadSession();
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!session) {
-        setUserId(null);
-        setUserRole(null);
-      } else {
-        setUserId(session.user.id);
-      }
+    const { data: sub } = supabase.auth.onAuthStateChange(() => {
+      loadSession();
     });
 
     return () => {
-      listener.subscription.unsubscribe();
+      sub.subscription.unsubscribe();
     };
   }, []);
 

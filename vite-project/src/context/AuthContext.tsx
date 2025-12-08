@@ -1,4 +1,3 @@
-// src/context/AuthContext.tsx
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { supabase } from "../lib/supabaseClient";
 
@@ -8,12 +7,14 @@ interface AuthContextType {
   userId: string | null;
   userRole: Role;
   loading: boolean;
+  signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
   userId: null,
   userRole: null,
   loading: true,
+  signOut: async () => {},
 });
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
@@ -21,44 +22,42 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [userRole, setUserRole] = useState<Role>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const loadSession = async () => {
-      setLoading(true);
-      const { data } = await supabase.auth.getSession();
-      const session = data.session;
+  const loadSession = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
 
-      if (!session) {
-        setUserId(null);
-        setUserRole(null);
-        setLoading(false);
-        return;
-      }
-
-      setUserId(session.user.id);
-
-      const { data: userData } = await supabase
-        .from("users")
-        .select("role")
-        .eq("id", session.user.id)
-        .single();
-
-      setUserRole(userData?.role ?? null);
+    if (!session) {
+      setUserId(null);
+      setUserRole(null);
       setLoading(false);
-    };
+      return;
+    }
 
+    setUserId(session.user.id);
+
+    const { data } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", session.user.id)
+      .single();
+
+    setUserRole(data?.role ?? null);
+    setLoading(false);
+  };
+
+  useEffect(() => {
     loadSession();
-
-    const { data: sub } = supabase.auth.onAuthStateChange(() => {
-      loadSession();
-    });
-
-    return () => {
-      sub.subscription.unsubscribe();
-    };
+    const { data: listener } = supabase.auth.onAuthStateChange(loadSession);
+    return () => listener.subscription.unsubscribe();
   }, []);
 
+  const signOut = async () => {
+    await supabase.auth.signOut();
+    setUserId(null);
+    setUserRole(null);
+  };
+
   return (
-    <AuthContext.Provider value={{ userId, userRole, loading }}>
+    <AuthContext.Provider value={{ userId, userRole, loading, signOut }}>
       {children}
     </AuthContext.Provider>
   );
